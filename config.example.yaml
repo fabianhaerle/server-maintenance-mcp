@@ -1,0 +1,23 @@
+# Server Maintenance MCP configuration file.
+# Copy to config.yaml and edit. Environment variables (MAINT_*) override these.
+
+# Bearer token clients must present to access the server.
+# Required for HTTP/SSE transport. Generate one with: openssl rand -hex 32
+auth_token: "change-me-to-a-long-random-string"
+
+# Bind address and port for the HTTP/SSE transport.
+host: "127.0.0.1"
+port: 8000
+
+# Directories from which log files may be read.
+# /var/log is always included. Add more as needed.
+allowed_log_dirs:
+  - "/var/log"
+  # - "/var/log/nginx"
+  # - "/opt/myapp/logs"
+
+# Maximum number of log lines a single tool call can return.
+max_log_lines: 1000
+
+# Default number of lines when not explicitly specified.
+default_log_lines: 100
