@@ -1,11 +1,20 @@
-# Server Maintenance MCP configuration file.
-# Copy to config.yaml and edit. Environment variables (MAINT_*) override these.
+# Server Maintenance MCP — example configuration.
+#
+# Copy it and edit the copy:
+#     cp config.example.yaml config.yaml        # auto-discovered name
+# Any other filename works too:
+#     python -m server_maintenance_mcp --config copy.yml
+#
+# config.yaml is gitignored, so secrets never get committed.
+# MAINT_* environment variables override every value in this file.
 
-# Bearer token clients must present to access the server.
-# Required for HTTP/SSE transport. Generate one with: openssl rand -hex 32
+# Bearer token clients must present as "Authorization: Bearer <token>".
+# IMPORTANT: an EMPTY string switches bearer auth off entirely.
+# Generate a strong token with:  openssl rand -hex 32
 auth_token: "change-me-to-a-long-random-string"
 
-# Bind address and port for the HTTP/SSE transport.
+# Bind address and port for the streamable-http transport.
+# 127.0.0.1 = reachable only from this machine; 0.0.0.0 = all interfaces.
 host: "127.0.0.1"
 port: 8000
 
@@ -21,3 +30,14 @@ max_log_lines: 1000
 
 # Default number of lines when not explicitly specified.
 default_log_lines: 100
+
+# ------------------------------------------------------------------
+# Environment variable overrides (highest precedence):
+#   MAINT_AUTH_TOKEN            bearer token
+#   MAINT_HOST / MAINT_PORT     bind address / port
+#   MAINT_MAX_LOG_LINES         cap per tool call
+#   MAINT_DEFAULT_LOG_LINES     default tail size
+#   MAINT_EXTRA_LOG_DIRS        comma-separated, merged with /var/log
+#   MAINT_REPLACE_LOG_DIRS      set to replace allowed_log_dirs entirely
+#   MAINT_CONFIG_FILE           path to this config file
+# ------------------------------------------------------------------
