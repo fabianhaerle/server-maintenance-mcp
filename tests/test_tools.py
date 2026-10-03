@@ -9,6 +9,9 @@ from unittest.mock import patch
 
 import pytest
 
+from mcp import Client
+from mcp.server import MCPServer
+
 from server_maintenance_mcp.config import ServerConfig
 from server_maintenance_mcp.tools._utils import validate_service_name
 
@@ -19,11 +22,10 @@ def _mock_completed(stdout: str = "", stderr: str = "", returncode: int = 0):
     )
 
 
-async def _call_tool(mcp, name: str, **kwargs) -> str:
-    """Helper: call a registered tool by name and return its text output."""
-    tool = await mcp.get_tool(name)
-    assert tool is not None, f"Tool '{name}' not found"
-    result = await tool.run(kwargs)
+async def _call_tool(mcp: MCPServer, name: str, **kwargs) -> str:
+    """Helper: call a tool through an in-memory client, return its text output."""
+    async with Client(mcp, raise_exceptions=True) as client:
+        result = await client.call_tool(name, kwargs)
     texts = []
     for block in result.content:
         text = getattr(block, "text", None)
@@ -77,8 +79,7 @@ class TestValidateServiceName:
 class TestSystemdTools:
     @pytest.fixture
     def mcp(self):
-        from fastmcp import FastMCP
-        mcp = FastMCP("test-systemd")
+        mcp = MCPServer("test-systemd")
         from server_maintenance_mcp.tools import systemd as systemd_mod
         systemd_mod.register(mcp)
         return mcp
@@ -182,13 +183,12 @@ class TestSystemdTools:
 class TestLogTools:
     @pytest.fixture
     def mcp_with_config(self, tmp_path):
-        from fastmcp import FastMCP
         config = ServerConfig(
             allowed_log_dirs=[str(tmp_path)],
             max_log_lines=1000,
             default_log_lines=100,
         )
-        mcp = FastMCP("test-logs")
+        mcp = MCPServer("test-logs")
         from server_maintenance_mcp.tools import logs as logs_mod
         logs_mod.register(mcp, config)
         return mcp, tmp_path
@@ -272,8 +272,7 @@ class TestLogTools:
 class TestSystemTools:
     @pytest.fixture
     def mcp(self):
-        from fastmcp import FastMCP
-        mcp = FastMCP("test-system")
+        mcp = MCPServer("test-system")
         from server_maintenance_mcp.tools import system as system_mod
         system_mod.register(mcp)
         return mcp
@@ -328,32 +327,38 @@ class TestSystemTools:
 
 
 class TestServerCreation:
-    def test_create_server_no_auth(self):
-        from server_maintenance_mcp.server import create_server
+    def test_build_server_no_auth(self):
+        from server_maintenance_mcp.server import build_server
 
         config = ServerConfig(auth_token="")
-        mcp = create_server(config)
+        mcp = build_server(config)
         assert mcp is not None
+        assert mcp.settings.auth is None
+        assert mcp._token_verifier is None
 
-    def test_create_server_with_auth(self):
-        from server_maintenance_mcp.server import create_server
+    def test_build_server_with_auth(self):
+        from server_maintenance_mcp.server import build_server
 
         config = ServerConfig(auth_token="test-token-12345")
-        mcp = create_server(config)
+        mcp = build_server(config)
         assert mcp is not None
+        assert mcp._token_verifier is not None
+        assert mcp.settings.auth is not None
 
     async def test_server_has_all_tools(self):
         import tempfile
-        from server_maintenance_mcp.server import create_server
+
+        from server_maintenance_mcp.server import build_server
 
         with tempfile.TemporaryDirectory() as td:
             config = ServerConfig(
                 auth_token="test-token",
                 allowed_log_dirs=[td],
             )
-            mcp = create_server(config)
-            tools = await mcp.list_tools()
-            tool_names = {t.name for t in tools}
+            mcp = build_server(config)
+            async with Client(mcp) as client:
+                result = await client.list_tools()
+            tool_names = {t.name for t in result.tools}
             assert "list_services" in tool_names
             assert "service_status" in tool_names
             assert "is_service_enabled" in tool_names
@@ -364,3 +369,26 @@ class TestServerCreation:
             assert "memory_usage" in tool_names
             assert "cpu_usage" in tool_names
             assert "system_info" in tool_names
+            assert "echo_test" in tool_names
+
+
+# ---------------------------------------------------------------------------
+# echo_test (connectivity test tool)
+# ---------------------------------------------------------------------------
+
+
+class TestEchoTest:
+    @pytest.fixture
+    def mcp(self):
+        from server_maintenance_mcp.server import build_server
+
+        return build_server(ServerConfig(auth_token=""))
+
+    async def test_echo_roundtrip(self, mcp):
+        result = await _call_tool(mcp, "echo_test", message="adaptation-check")
+        assert result.startswith("echo: adaptation-check")
+        assert "server-maintenance-mcp v" in result
+
+    async def test_echo_default_message(self, mcp):
+        result = await _call_tool(mcp, "echo_test")
+        assert result.startswith("echo: hello")

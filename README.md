@@ -1,6 +1,6 @@
 # server-maintenance-mcp
 
-A read-only MCP (Model Context Protocol) server for server maintenance, built with [FastMCP](https://gofastmcp.com). Provides tools for inspecting systemd services, reading log files, and monitoring system resources — with **defense-in-depth privacy protection** that prevents LLMs from accessing credentials, keys, and other secrets.
+A read-only MCP (Model Context Protocol) server for server maintenance, built with the official [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk). Provides tools for inspecting systemd services, reading log files, and monitoring system resources — with **defense-in-depth privacy protection** that prevents LLMs from accessing credentials, keys, and other secrets.
 
 ## Features
 

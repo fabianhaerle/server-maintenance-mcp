@@ -4,24 +4,27 @@ from __future__ import annotations
 
 import re
 
-from fastmcp import FastMCP
+from mcp.server import MCPServer
 
 from server_maintenance_mcp.config import ServerConfig
 from server_maintenance_mcp.security.paths import PathGuard, PathValidationError
 from server_maintenance_mcp.security.redaction import redact_output
 
 
-_VALID_LOG_LEVELS = {"emerg", "alert", "crit", "err", "warning", "notice", "info", "debug"}
+# Syslog severities, most severe first. Order matters: the level filter
+# returns lines at the requested level *or more severe*.
+_SEVERITY_ORDER = ("emerg", "alert", "crit", "err", "warning", "notice", "info", "debug")
+_VALID_LOG_LEVELS = frozenset(_SEVERITY_ORDER)
 
 
-def register(mcp: FastMCP, config: ServerConfig) -> None:
-    """Register log-reading tools on the given FastMCP instance."""
+def register(mcp: MCPServer, config: ServerConfig) -> None:
+    """Register log-reading tools on the given MCPServer instance."""
 
     path_guard = PathGuard(allowed_dirs=config.allowed_log_dirs)
     max_lines = config.max_log_lines
     default_lines = config.default_log_lines
 
-    @mcp.tool
+    @mcp.tool()
     @redact_output
     async def read_log(
         path: str,
@@ -74,9 +77,8 @@ def register(mcp: FastMCP, config: ServerConfig) -> None:
         tail = all_lines[-n:]
 
         if level:
-            priority_order = list(_VALID_LOG_LEVELS)
-            level_idx = priority_order.index(level)
-            allowed_levels = set(priority_order[: level_idx + 1])
+            level_idx = _SEVERITY_ORDER.index(level)
+            allowed_levels = set(_SEVERITY_ORDER[: level_idx + 1])
             tail = [
                 line
                 for line in tail
@@ -88,7 +90,7 @@ def register(mcp: FastMCP, config: ServerConfig) -> None:
 
         return "".join(tail)
 
-    @mcp.tool
+    @mcp.tool()
     @redact_output
     async def search_logs(
         path: str,

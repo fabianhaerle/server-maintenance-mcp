@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from fastmcp import FastMCP
+from mcp.server import MCPServer
 
 from server_maintenance_mcp.security.redaction import redact_output
 from server_maintenance_mcp.tools._utils import run_command, validate_service_name
 
 
-def register(mcp: FastMCP) -> None:
-    """Register all systemd tools on the given FastMCP instance."""
+def register(mcp: MCPServer) -> None:
+    """Register all systemd tools on the given MCPServer instance."""
 
-    @mcp.tool
+    @mcp.tool()
     @redact_output
     async def list_services(state: str | None = None) -> str:
         """List systemd service units and their active/sub states.
@@ -61,7 +61,7 @@ def register(mcp: FastMCP) -> None:
 
         return f"{'Unit':<40} {'Load':<8} {'Active':<10} {'Sub':<10} Description\n" + "\n".join(formatted)
 
-    @mcp.tool
+    @mcp.tool()
     @redact_output
     async def service_status(service: str) -> str:
         """Get the status of a systemd service.
@@ -122,7 +122,7 @@ def register(mcp: FastMCP) -> None:
         )
         return summary
 
-    @mcp.tool
+    @mcp.tool()
     @redact_output
     async def is_service_enabled(service: str) -> str:
         """Check whether a systemd service is enabled at boot.
@@ -159,7 +159,7 @@ def register(mcp: FastMCP) -> None:
             return f"{service}: error - {stderr}"
         return f"{service}: unknown (rc={rc})"
 
-    @mcp.tool
+    @mcp.tool()
     @redact_output
     async def service_logs(
         service: str,

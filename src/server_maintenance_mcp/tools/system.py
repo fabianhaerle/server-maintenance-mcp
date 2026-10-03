@@ -5,16 +5,16 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from fastmcp import FastMCP
+from mcp.server import MCPServer
 
 from server_maintenance_mcp.security.redaction import redact_output
 from server_maintenance_mcp.tools._utils import run_command
 
 
-def register(mcp: FastMCP) -> None:
-    """Register system monitoring tools on the given FastMCP instance."""
+def register(mcp: MCPServer) -> None:
+    """Register system monitoring tools on the given MCPServer instance."""
 
-    @mcp.tool
+    @mcp.tool()
     @redact_output
     async def disk_usage() -> str:
         """Show disk space usage for all mounted filesystems.
@@ -28,7 +28,7 @@ def register(mcp: FastMCP) -> None:
             return f"Error getting disk usage (rc={result.returncode}): {result.stderr.strip()}"
         return result.stdout.strip()
 
-    @mcp.tool
+    @mcp.tool()
     @redact_output
     async def memory_usage() -> str:
         """Show system memory usage (RAM and swap).
@@ -58,7 +58,7 @@ def register(mcp: FastMCP) -> None:
 
         return "Error: unable to determine memory usage (neither 'free' nor /proc/meminfo available)"
 
-    @mcp.tool
+    @mcp.tool()
     @redact_output
     async def cpu_usage() -> str:
         """Show CPU load averages and top processes by CPU usage.
@@ -94,7 +94,7 @@ def register(mcp: FastMCP) -> None:
 
         return f"Load averages (1/5/15 min): {loadavg}\n\nTop processes by CPU:\n{formatted}"
 
-    @mcp.tool
+    @mcp.tool()
     @redact_output
     async def system_info() -> str:
         """Show general system information.

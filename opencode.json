@@ -1,0 +1,10 @@
+{
+  "mcp": {
+    "servers": {
+      "local-demo-server": {
+        "type": "remote",
+        "url": "http://localhost:8899/mcp"
+      }
+    }
+  }
+}

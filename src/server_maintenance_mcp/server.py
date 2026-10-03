@@ -1,8 +1,17 @@
-"""FastMCP server instance with auth and tool registration."""
+"""MCP server instance with auth and tool registration (official SDK, v2 API).
+
+Same startup pattern as demo_server.py: load config -> build_server() ->
+run streamable-http. Bearer auth is wired when the configured token is
+non-empty; an empty token switches auth off entirely.
+"""
 
 from __future__ import annotations
 
-from fastmcp import FastMCP
+from typing import Any
+
+from mcp.server import MCPServer
+from mcp.server.auth.provider import AccessToken, TokenVerifier
+from mcp.server.auth.settings import AuthSettings
 
 from server_maintenance_mcp import __version__
 from server_maintenance_mcp.config import ServerConfig, load_config
@@ -11,34 +20,54 @@ from server_maintenance_mcp.tools import system as system_tools
 from server_maintenance_mcp.tools import systemd as systemd_tools
 
 
-def create_server(config: ServerConfig | None = None) -> FastMCP:
-    """Create and configure the FastMCP server instance.
+class StaticTokenVerifier(TokenVerifier):
+    """Accepts exactly the one token configured for the server."""
+
+    def __init__(self, token: str) -> None:
+        self._token = token
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        if token == self._token:
+            return AccessToken(
+                token=token,
+                client_id="maintenance-client",
+                scopes=["maintenance"],
+            )
+        return None
+
+
+def _base_url(config: ServerConfig) -> str:
+    """A usable base URL for auth metadata (0.0.0.0 is not addressable)."""
+    host = config.host if config.host not in ("", "0.0.0.0", "::") else "127.0.0.1"
+    return f"http://{host}:{config.port}"
+
+
+def build_server(config: ServerConfig | None = None) -> MCPServer:
+    """Create and configure the MCPServer instance with all tools registered.
 
     Args:
         config: Optional ServerConfig. If None, loads from file/env.
 
     Returns:
-        A configured FastMCP instance with all tools registered.
+        A configured MCPServer with all tools registered.
     """
     if config is None:
         config = load_config()
 
-    auth = None
+    auth_kwargs: dict[str, Any] = {}
     if config.auth_token:
-        from fastmcp.server.auth.providers.jwt import StaticTokenVerifier
+        auth_kwargs = {
+            "token_verifier": StaticTokenVerifier(config.auth_token),
+            "auth": AuthSettings(
+                issuer_url=_base_url(config),
+                resource_server_url=f"{_base_url(config)}/mcp",
+                required_scopes=["maintenance"],
+                validate_token_resource=False,  # the static verifier checks the token itself
+            ),
+        }
 
-        auth = StaticTokenVerifier(
-            tokens={
-                config.auth_token: {
-                    "client_id": "maintenance-client",
-                    "scopes": ["maintenance"],
-                }
-            },
-            required_scopes=["maintenance"],
-        )
-
-    mcp = FastMCP(
-        name="server-maintenance-mcp",
+    mcp = MCPServer(
+        "server-maintenance-mcp",
         instructions=(
             "Read-only server maintenance tools. "
             "Provides systemd service status, log file reading, and system "
@@ -46,22 +75,21 @@ def create_server(config: ServerConfig | None = None) -> FastMCP:
             "remove passwords, API keys, private keys, and other secrets."
         ),
         version=__version__,
-        auth=auth,
+        **auth_kwargs,
     )
 
     systemd_tools.register(mcp)
     system_tools.register(mcp)
     logs_tools.register(mcp, config)
 
+    @mcp.tool()
+    def echo_test(message: str = "hello") -> str:
+        """Connectivity test tool: echoes the message back with the server version.
+
+        Touches no system state and runs no commands, so it is safe to call
+        on any machine. Use it to verify reachability, authentication, and
+        the tool plumbing without invoking the real maintenance tools.
+        """
+        return f"echo: {message} (server-maintenance-mcp v{__version__})"
+
     return mcp
-
-
-def run() -> None:
-    """Load config and start the server with HTTP transport."""
-    config = load_config()
-    mcp = create_server(config)
-    mcp.run(
-        transport="http",
-        host=config.host,
-        port=config.port,
-    )
