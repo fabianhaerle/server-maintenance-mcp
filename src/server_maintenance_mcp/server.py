@@ -7,6 +7,7 @@ non-empty; an empty token switches auth off entirely.
 
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 from mcp.server import MCPServer
@@ -93,3 +94,15 @@ def build_server(config: ServerConfig | None = None) -> MCPServer:
         return f"echo: {message} (server-maintenance-mcp v{__version__})"
 
     return mcp
+
+
+if __name__ == "__main__":
+    # This module only builds the server; it has no startup code.
+    # Start the real server with:
+    #   python -m server_maintenance_mcp   (add --config <file> / --stdio as needed)
+    # or run the demo server with:  python demo_server.py
+    sys.exit(
+        "server.py is a library module and does nothing on its own.\n"
+        "Start the server with:  python -m server_maintenance_mcp\n"
+        "(run it with the project's venv python: .venv/bin/python)"
+    )
